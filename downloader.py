@@ -1,6 +1,6 @@
 """The audiogames.net forum downloader."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from random import uniform
 from time import sleep
 from typing import Iterator, List, Optional, Tuple, Union
@@ -10,8 +10,7 @@ from bs4.element import NavigableString, Tag
 from html2markdown import convert
 from requests import Response
 from requests import Session as RequestsSession
-from sqlalchemy import (Column, DateTime, ForeignKey, Integer, String,
-                        create_engine)
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, create_engine
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Query
@@ -261,6 +260,23 @@ def parse_thread_page(soup: BeautifulSoup, thread: Thread) -> None:
         parse_message(thread, div)
 
 
+def parse_datetime(text: str) -> datetime:
+    """Parse and return a datetime object.
+
+    :param text: The text to parse. For example ``2020-15-5``, or
+        ``Yesterday 18:30:14``.
+    """
+    yesterday: str = "Yesterday"
+    today: str = "Today"
+    if text.startswith(yesterday):
+        when: datetime = datetime.utcnow() - timedelta(days=1)
+        text = text.replace(yesterday, when.date().isoformat())
+    elif text.startswith(today):
+        now: datetime = datetime.utcnow()
+        text = text.replace(today, now.date().isoformat())
+    return datetime.fromisoformat(text)
+
+
 def parse_message(thread: Thread, div: Tag) -> None:
     """Parse the given message.
 
@@ -286,7 +302,7 @@ def parse_message(thread: Thread, div: Tag) -> None:
         )
         registered: Optional[datetime] = None
         if li is not None:
-            registered = datetime.fromisoformat(li.find("strong").text)
+            registered = parse_datetime(li.find("strong").text)
         user = User(name=username, registered=registered)
         user.save()
     else:
@@ -300,7 +316,7 @@ def parse_message(thread: Thread, div: Tag) -> None:
     signature: Optional[FindType] = content.find("div")
     span = div.find("span", attrs={"class": "post-link"})
     assert isinstance(span, Tag)
-    posted: datetime = datetime.fromisoformat(span.text)
+    posted: datetime = parse_datetime(span.text)
     strings: List[str] = []
     child: FindType
     for child in content:

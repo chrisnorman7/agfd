@@ -2,3 +2,4 @@ beautifulsoup4
 sqlalchemy
 html2markdown
 requests
+lxml
